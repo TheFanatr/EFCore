@@ -8,17 +8,22 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Query.Internal
 {
     public class SqlServerShapedQueryOptimizer : RelationalShapedQueryOptimizer
     {
+        private readonly QuerySqlGeneratorDependencies _sqlGeneratorDependencies;
+
         public SqlServerShapedQueryOptimizer(
-            QueryCompilationContext queryCompilationContext,
-            ISqlExpressionFactory sqlExpressionFactory)
-            : base(queryCompilationContext, sqlExpressionFactory)
+            ShapedQueryOptimizerDependencies dependencies,
+            RelationalShapedQueryOptimizerDependencies relationalDependencies,
+            QuerySqlGeneratorDependencies sqlGeneratorDependencies,
+            QueryCompilationContext queryCompilationContext)
+            : base(dependencies, relationalDependencies, queryCompilationContext)
         {
+            _sqlGeneratorDependencies = sqlGeneratorDependencies;
         }
 
         public override Expression Visit(Expression query)
         {
             query = base.Visit(query);
-            query = new SearchConditionConvertingExpressionVisitor(SqlExpressionFactory).Visit(query);
+            query = new SearchConditionConvertingExpressionVisitor(_sqlGeneratorDependencies, SqlExpressionFactory).Visit(query);
             query = new SqlExpressionOptimizingVisitor(SqlExpressionFactory, UseRelationalNulls).Visit(query);
 
             return query;

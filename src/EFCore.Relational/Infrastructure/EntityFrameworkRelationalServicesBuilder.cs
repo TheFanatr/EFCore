@@ -184,6 +184,10 @@ namespace Microsoft.EntityFrameworkCore.Infrastructure
                 .AddDependencySingleton<RelationalMethodCallTranslatorProviderDependencies>()
                 .AddDependencySingleton<RelationalMemberTranslatorProviderDependencies>()
                 .AddDependencySingleton<RelationalSqlTranslatingExpressionVisitorFactoryDependencies>()
+                .AddDependencySingleton<RelationalQueryableMethodTranslatingExpressionVisitorDependencies>()
+                .AddDependencySingleton<QuerySqlGeneratorDependencies>()
+                .AddDependencySingleton<RelationalShapedQueryCompilingExpressionVisitorDependencies>()
+                .AddDependencySingleton<RelationalShapedQueryOptimizerDependencies>()
                 .AddDependencyScoped<MigrationsSqlGeneratorDependencies>()
                 .AddDependencyScoped<RelationalConventionSetBuilderDependencies>()
                 .AddDependencyScoped<ModificationCommandBatchFactoryDependencies>()
@@ -193,6 +197,7 @@ namespace Microsoft.EntityFrameworkCore.Infrastructure
                 .AddDependencyScoped<RelationalCompiledQueryCacheKeyGeneratorDependencies>()
                 .AddDependencyScoped<RelationalConnectionDependencies>()
                 .AddDependencyScoped<RelationalDatabaseDependencies>()
+                .AddDependencyScoped<RelationalQueryContextDependencies>()
                 .AddDependencyScoped<RelationalEvaluatableExpressionFilterDependencies>();
 
             return base.TryAddCoreServices();

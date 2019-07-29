@@ -23,19 +23,21 @@ namespace Microsoft.EntityFrameworkCore.Query
 
         public RelationalShapedQueryCompilingExpressionVisitor(
             QueryCompilationContext queryCompilationContext,
-            IEntityMaterializerSource entityMaterializerSource,
-            IQuerySqlGeneratorFactory querySqlGeneratorFactory,
-            ISqlExpressionFactory sqlExpressionFactory,
-            IParameterNameGeneratorFactory parameterNameGeneratorFactory)
-            : base(queryCompilationContext, entityMaterializerSource)
+            ShapedQueryCompilingExpressionVisitorDependencies dependencies,
+            RelationalShapedQueryCompilingExpressionVisitorDependencies relationalDependencies)
+            : base(queryCompilationContext, dependencies)
         {
-            _querySqlGeneratorFactory = querySqlGeneratorFactory;
-            _sqlExpressionFactory = sqlExpressionFactory;
-            _parameterNameGeneratorFactory = parameterNameGeneratorFactory;
+            RelationalDependencies = relationalDependencies;
+
+            _querySqlGeneratorFactory = relationalDependencies.QuerySqlGeneratorFactory;
+            _sqlExpressionFactory = relationalDependencies.SqlExpressionFactory;
+            _parameterNameGeneratorFactory = relationalDependencies.ParameterNameGeneratorFactory;
             _contextType = queryCompilationContext.ContextType;
             _logger = queryCompilationContext.Logger;
             _tags = queryCompilationContext.Tags;
         }
+
+        protected virtual RelationalShapedQueryCompilingExpressionVisitorDependencies RelationalDependencies { get; }
 
         protected override Expression VisitShapedQueryExpression(ShapedQueryExpression shapedQueryExpression)
         {

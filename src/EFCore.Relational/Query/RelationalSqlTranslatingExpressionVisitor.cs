@@ -5,7 +5,6 @@ using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Reflection;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -25,19 +24,21 @@ namespace Microsoft.EntityFrameworkCore.Query
         private readonly SqlTypeMappingVerifyingExpressionVisitor _sqlVerifyingExpressionVisitor;
 
         public RelationalSqlTranslatingExpressionVisitor(
+            RelationalSqlTranslatingExpressionVisitorFactoryDependencies dependencies,
             IModel model,
-            QueryableMethodTranslatingExpressionVisitor queryableMethodTranslatingExpressionVisitor,
-            ISqlExpressionFactory sqlExpressionFactory,
-            IMemberTranslatorProvider memberTranslatorProvider,
-            IMethodCallTranslatorProvider methodCallTranslatorProvider)
+            QueryableMethodTranslatingExpressionVisitor queryableMethodTranslatingExpressionVisitor)
         {
+            Dependencies = dependencies;
+
             _model = model;
             _queryableMethodTranslatingExpressionVisitor = queryableMethodTranslatingExpressionVisitor;
-            _sqlExpressionFactory = sqlExpressionFactory;
-            _memberTranslatorProvider = memberTranslatorProvider;
-            _methodCallTranslatorProvider = methodCallTranslatorProvider;
+            _sqlExpressionFactory = dependencies.SqlExpressionFactory;
+            _memberTranslatorProvider = dependencies.MemberTranslatorProvider;
+            _methodCallTranslatorProvider = dependencies.MethodCallTranslatorProvider;
             _sqlVerifyingExpressionVisitor = new SqlTypeMappingVerifyingExpressionVisitor();
         }
+
+        protected virtual RelationalSqlTranslatingExpressionVisitorFactoryDependencies Dependencies { get; }
 
         public virtual SqlExpression Translate(Expression expression)
         {
