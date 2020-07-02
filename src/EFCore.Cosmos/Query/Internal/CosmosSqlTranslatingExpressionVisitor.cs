@@ -548,6 +548,16 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
                 ? new SqlParameterExpression(Check.NotNull(parameterExpression, nameof(parameterExpression)), null)
                 : null;
 
+        // Needed to override [return: NotNullIfNotNull("node")] attribute on non-overridden Visit. VisitExtension(node) when node is not null is more/less identical to the default behaviour.
+
+        ///// <summary>
+        /////     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        /////     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        /////     any release. You should only use it directly in your code with extreme caution and knowing that
+        /////     doing so can result in application failures when updating to a new Entity Framework Core release.
+        ///// </summary>
+        //public override Expression Visit(Expression node) => node is null ? null : VisitExtension(node);
+
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
         ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
@@ -558,7 +568,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         {
             Check.NotNull(unaryExpression, nameof(unaryExpression));
 
-            var operand = Visit(unaryExpression.Operand);
+            var operand = VisitExtension(unaryExpression.Operand);
 
             if (operand is EntityReferenceExpression entityReferenceExpression
                 && (unaryExpression.NodeType == ExpressionType.Convert

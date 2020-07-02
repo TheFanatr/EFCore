@@ -3,12 +3,16 @@
 
 using System;
 using System.Linq;
+using System.Linq.Expressions;
 using JetBrains.Annotations;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Cosmos.Metadata.Internal;
+using Microsoft.EntityFrameworkCore.Cosmos.Storage.Internal;
 using Microsoft.EntityFrameworkCore.Cosmos.ValueGeneration.Internal;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.EntityFrameworkCore.Utilities;
 using Newtonsoft.Json.Linq;
 
@@ -144,6 +148,13 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             }
         }
 
+        //class Chode : Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<JObject, string>
+        //{
+        //    public Chode([NotNull] Expression<Func<JObject, string>> convertToProviderExpression, [NotNull] Expression<Func<string, JObject>> convertFromProviderExpression, [CanBeNull] ConverterMappingHints mappingHints = null) : base(convertToProviderExpression, convertFromProviderExpression, mappingHints)
+        //    {
+        //    }
+        //}
+
         private static void ProcessJObjectProperty(IConventionEntityTypeBuilder entityTypeBuilder)
         {
             var entityType = entityTypeBuilder.Metadata;
@@ -153,6 +164,11 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 var jObjectProperty = entityTypeBuilder.Property(typeof(JObject), JObjectPropertyName);
                 jObjectProperty?.ToJsonProperty("");
                 jObjectProperty?.ValueGenerated(ValueGenerated.OnAddOrUpdate);
+                //jObjectProperty?.HasConversion(new Chode(_ => default, _ => default), false);
+                //#pragma warning disable EF1001 // Internal EF Core API usage.
+                //                jObjectProperty.HasAnnotation(Microsoft.EntityFrameworkCore.Metadata.Internal.CoreAnnotationNames.TypeMapping, new CosmosTypeMapping(typeof(JObject), new ValueComparer));
+                //#pragma warning restore EF1001 // Internal EF Core API usage.
+
             }
             else
             {

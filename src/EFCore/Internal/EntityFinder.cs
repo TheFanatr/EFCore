@@ -369,6 +369,8 @@ namespace Microsoft.EntityFrameworkCore.Internal
                     parameter));
         }
 
+        // TODO: Consider adding property.IsGhost for shadow properties not mapped to the database.
+
         private static Expression<Func<object, object[]>> BuildProjection(IEntityType entityType)
         {
             var entityParameter = Expression.Parameter(typeof(object), "e");

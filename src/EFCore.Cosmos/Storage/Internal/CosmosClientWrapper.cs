@@ -4,6 +4,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Configuration;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -68,8 +69,104 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Storage.Internal
 
         static CosmosClientWrapper()
         {
-            Serializer.Converters.Add(new ByteArrayConverter());
             Serializer.DateFormatHandling = DateFormatHandling.IsoDateFormat;
+
+            // TODO: Support JToken and JObject collections and dictionaries with those values.
+            // TODO: Make less convoluted.
+
+            static Func<T, TResult?> MakeNullable<T, TResult>(Func<T, TResult> translator) where TResult : struct => value => value is null ? default : new TResult?(translator.Invoke(value));
+
+            static Func<T?, TResult> MakeNullableConsumer<T, TResult>(Func<T, TResult> consumer) where T : struct => value => value is null ? default : consumer.Invoke(value.GetValueOrDefault());
+
+            AddValueConversionSetsExhaustive(JsonToken.Boolean, Convert.ToBoolean);
+            AddValueConversionSetsExhaustive(JsonToken.Integer, Convert.ToByte);
+            AddValueConversionSetsExhaustive(JsonToken.Integer, Convert.ToSByte);
+            AddValueConversionSetsExhaustive(JsonToken.Integer, Convert.ToInt16);
+            AddValueConversionSetsExhaustive(JsonToken.Integer, Convert.ToInt32);
+            AddValueConversionSetsExhaustive(JsonToken.Integer, Convert.ToInt64);
+            AddValueConversionSetsExhaustive(JsonToken.Float, Convert.ToSingle);
+            AddValueConversionSetsExhaustive(JsonToken.Float, Convert.ToDouble);
+            AddValueConversionSetsExhaustive(JsonToken.Float, Convert.ToDecimal);
+            AddValueConversionSetsExhaustive(JsonToken.Date, Convert.ToDateTime, renderer: value => ((DateTimeOffset)value).ToString("o"));
+            AddConversionSetsExhaustive(JsonToken.String, Convert.ToString, nullable: true);
+            AddValueConversionSetsExhaustive(JsonToken.String, value => Guid.Parse(Convert.ToString(value)), renderer: value => value.ToString("D"));
+
+            static void AddValueConversionSetsExhaustive<TElement>(JsonToken token, Func<object, TElement> translator, Func<TElement, string> renderer = default) where TElement : struct
+            {
+                Func<TElement, string> defaultRenderer = value => Convert.ToString(value);
+
+                // Expclicitly does not create dictionary conversions nullable keys, because it could lead to the assumption that a KVP of (null, <value>) is valid.
+                // Second call does not create set conversions because sets of Nullable<T> and a value are not allowed. Look into supporting this in the future, as it might make sense, but would need special support in the key renderers and translators.
+
+                AddConversionSetsExhaustive(token, translator, renderer);
+                AddConversionSetsExhaustive(token, MakeNullable(translator), MakeNullableConsumer(renderer ?? defaultRenderer), nullable: true, addPairedSets: false);
+            }
+
+            static void AddConversionSetsExhaustive<TElement>(JsonToken token, Func<object, TElement> translator, Func<TElement, string> renderer = default, bool nullable = default, bool addPairedSets = true)
+            {
+                static Func<T, TResult> MakeGuaranteed<T, TResult>(Func<T, TResult> translator) => value => value is null ? throw new Exception() : translator.Invoke(value);
+
+                if (nullable)
+                {
+                    AddConversion(token, translator, renderer, true);
+                }
+                else
+                {
+                    // MakeGuaranteed is used to make sure conversion from null to a non-nullable value never occurs as it would be a model error (JSON value was null, but model declares value as non-nullable). Failure to do this would cause JSON null to be translated to [0001-01-01 12:00:00 AM] for DateTime, 0 for int, et cetera.
+
+                    AddConversion(token, MakeGuaranteed(translator), renderer, false);
+                }
+
+                if (addPairedSets)
+                {
+                    AddValuePairedConversionSets(JsonToken.Boolean, Convert.ToBoolean);
+                    AddValuePairedConversionSets(JsonToken.Integer, Convert.ToByte);
+                    AddValuePairedConversionSets(JsonToken.Integer, Convert.ToSByte);
+                    AddValuePairedConversionSets(JsonToken.Integer, Convert.ToInt16);
+                    AddValuePairedConversionSets(JsonToken.Integer, Convert.ToInt32);
+                    AddValuePairedConversionSets(JsonToken.Integer, Convert.ToInt64);
+                    AddValuePairedConversionSets(JsonToken.Float, Convert.ToSingle);
+                    AddValuePairedConversionSets(JsonToken.Float, Convert.ToDouble);
+                    AddValuePairedConversionSets(JsonToken.Float, Convert.ToDecimal);
+                    AddValuePairedConversionSets(JsonToken.Date, Convert.ToDateTime, valueRenderer: value => ((DateTimeOffset)value).ToString("o"));
+                    AddPairedConversionSets(JsonToken.String, Convert.ToString);
+                    AddValuePairedConversionSets(JsonToken.String, value => Guid.Parse(Convert.ToString(value)), value => value.ToString("D"));
+                }
+
+                void AddValuePairedConversionSets<TElementB>(JsonToken token, Func<object, TElementB> valueTranslator, Func<TElementB, object> valueRenderer = default) where TElementB : struct
+                {
+                    Func<TElementB, object> defaultValueRenderer = element => element;
+
+                    AddPairedConversionSets(token, MakeGuaranteed(valueTranslator), valueRenderer);
+                    AddPairedConversionSets(token, MakeNullable(valueTranslator), MakeNullableConsumer(valueRenderer ?? defaultValueRenderer), true);
+                }
+
+                void AddPairedConversionSets<TElementB>(JsonToken token, Func<object, TElementB> valueTranslator, Func<TElementB, object> valueRenderer = default, bool nullableValue = default) => AddPairedConversion(token, translator, valueTranslator, renderer, valueRenderer, nullableValue);
+            }
+
+            static void AddConversion<TElement>(JsonToken token, Func<object, TElement> translator, Func<TElement, object> renderer = default, bool nullable = default)
+            {
+                AddBuiltConverter<TElement[]>(list => list.ToArray());
+
+                AddBuiltConverter<HashSet<TElement>>(list => list.ToHashSet());
+                AddBuiltConverter<List<TElement>>();
+
+                AddBuiltConverter<ISet<TElement>>(list => list.ToHashSet());
+                AddBuiltConverter<IList<TElement>>();
+                AddBuiltConverter<ICollection<TElement>>();
+
+                void AddBuiltConverter<TCollection>(Func<List<TElement>, TCollection> materializer = default) where TCollection : ICollection<TElement> => Serializer.Converters.Add(new CollectionConverter<TElement, TCollection>(materializer, renderer, (JsonToken foundToken, object data, out TElement value) => foundToken == token || (nullable && foundToken is JsonToken.Null) ? (value = translator.Invoke(data), Result: true).Result : (value = default, Result: false).Result) { });
+            }
+
+            static void AddPairedConversion<TElementA, TElementB>(JsonToken token, Func<object, TElementA> labelTranslator, Func<object, TElementB> valueTranslator, Func<TElementA, string> labelRenderer = default, Func<TElementB, object> valueRenderer = default, bool nullableValue = default)
+            {
+                // TODO: Add support for Lookup<K,V>s.
+
+                AddBuiltConverter<Dictionary<TElementA, TElementB>>();
+                AddBuiltConverter<IDictionary<TElementA, TElementB>>();
+
+                void AddBuiltConverter<TDictionary>(Func<Dictionary<TElementA, TElementB>, TDictionary> materializer = default) where TDictionary : IDictionary<TElementA, TElementB> => Serializer.Converters.Add(new DictionaryConverter<TElementA, TElementB, TDictionary>(materializer, labelRenderer, valueRenderer, (JsonToken _, object data, out TElementA label) => (label = labelTranslator.Invoke(Convert.ToString(data)), Result: true).Result, (JsonToken foundToken, object data, out TElementB value) => foundToken == token || (nullableValue && foundToken is JsonToken.Null) ? (value = valueTranslator.Invoke(data), Result: true).Result : (value = default, Result: false).Result) { });
+            }
         }
 
         /// <summary>

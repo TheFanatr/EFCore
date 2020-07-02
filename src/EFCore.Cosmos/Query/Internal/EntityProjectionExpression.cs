@@ -127,7 +127,8 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
                 _propertyExpressionsMap[property] = expression;
             }
 
-            if (!clientEval
+            if (property.Name != EntityFrameworkCore.Metadata.Conventions.StoreKeyConvention.JObjectPropertyName
+                && !clientEval
                 && expression.Name.Length == 0)
             {
                 // Non-persisted property can't be translated
@@ -167,6 +168,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
                 && expression.Name.Length == 0)
             {
                 // Non-persisted navigation can't be translated
+                //return ConstantExpression.Default(typeof(object));
                 return null;
             }
 
