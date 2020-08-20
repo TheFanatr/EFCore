@@ -368,10 +368,13 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         {
             Check.NotNull(methodCallExpression, nameof(methodCallExpression));
 
-            if (methodCallExpression.TryGetEFPropertyArguments(out var source, out var propertyName)
+            // TODO: Consider moving indexer translation here, because it will be known whether or not it is a valid indexer use, whereas if the get_Item method is translated by itself, it needs to be checked for validity separately (ultimately, twice).
+
+            if ((methodCallExpression.TryGetEFPropertyArguments(out var source, out var propertyName)
                 || methodCallExpression.TryGetIndexerArguments(_model, out source, out propertyName))
+                && TryBindMember(Visit(source), MemberIdentity.Create(propertyName)) is Expression boundMemberAccess)
             {
-                return TryBindMember(Visit(source), MemberIdentity.Create(propertyName));
+                return boundMemberAccess;
             }
 
             SqlExpression sqlObject = null;
@@ -548,16 +551,6 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
                 ? new SqlParameterExpression(Check.NotNull(parameterExpression, nameof(parameterExpression)), null)
                 : null;
 
-        // Needed to override [return: NotNullIfNotNull("node")] attribute on non-overridden Visit. VisitExtension(node) when node is not null is more/less identical to the default behaviour.
-
-        ///// <summary>
-        /////     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
-        /////     the same compatibility standards as public APIs. It may be changed or removed without notice in
-        /////     any release. You should only use it directly in your code with extreme caution and knowing that
-        /////     doing so can result in application failures when updating to a new Entity Framework Core release.
-        ///// </summary>
-        //public override Expression Visit(Expression node) => node is null ? null : VisitExtension(node);
-
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
         ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
@@ -568,7 +561,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         {
             Check.NotNull(unaryExpression, nameof(unaryExpression));
 
-            var operand = VisitExtension(unaryExpression.Operand);
+            var operand = Visit(unaryExpression.Operand);
 
             if (operand is EntityReferenceExpression entityReferenceExpression
                 && (unaryExpression.NodeType == ExpressionType.Convert
