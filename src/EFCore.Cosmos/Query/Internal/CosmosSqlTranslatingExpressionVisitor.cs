@@ -368,10 +368,13 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         {
             Check.NotNull(methodCallExpression, nameof(methodCallExpression));
 
-            if (methodCallExpression.TryGetEFPropertyArguments(out var source, out var propertyName)
+            // TODO: Consider moving indexer translation here, because it will be known whether or not it is a valid indexer use, whereas if the get_Item method is translated by itself, it needs to be checked for validity separately (ultimately, twice).
+
+            if ((methodCallExpression.TryGetEFPropertyArguments(out var source, out var propertyName)
                 || methodCallExpression.TryGetIndexerArguments(_model, out source, out propertyName))
+                && TryBindMember(Visit(source), MemberIdentity.Create(propertyName)) is Expression boundMemberAccess)
             {
-                return TryBindMember(Visit(source), MemberIdentity.Create(propertyName));
+                return boundMemberAccess;
             }
 
             SqlExpression sqlObject = null;
